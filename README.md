@@ -1,6 +1,6 @@
 # PhotoNext
 
-**An agent-first image cockpit that ships inside [Minotauris](https://github.com/RickyFFYT/Minotauris).**
+**An agent-first image cockpit that ships inside [Minotauris](https://minotauris.app).**
 
 PhotoNext is a built-in extension for the Minotauris desktop app: one document (a canvas
 with a real layer stack), **29 tools** exposed to the agent over MCP, a Photoshop-style
