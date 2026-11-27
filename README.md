@@ -7,6 +7,10 @@ with a real layer stack), **29 tools** exposed to the agent over MCP, a Photosho
 sidebar panel that renders that document, a native C++ raster engine, and a vendored
 libvips backend so it works on an installed app with no npm and no network.
 
+![The PhotoNext cockpit open in the Minotauris sidebar](docs/images/photonext-cockpit.png)
+
+*The cockpit beside a task: `gate-mark.png` at 2000 × 2000, revision 64, mid-edit. Every control in that panel is a tool call — the layer row, the brush, the history list; the status bar names the backend (`libvips`).*
+
 This repository is the source of that extension, mirrored from
 `apps/desktop-tauri/src-tauri/resources/extensions-builtin/com.minotauris.photonext`
 in the Minotauris monorepo.
