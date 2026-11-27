@@ -1,0 +1,13 @@
+{
+  "name": "photonext-backend-vendor",
+  "private": true,
+  "description": "Prebuilt libvips bindings shipped inside the PhotoNext builtin extension (Decision D1, Option A). Reinstalled with `npm install --omit=dev` in this directory.",
+  "dependencies": {
+    "@img/sharp-darwin-arm64": "^0.34.5",
+    "@img/sharp-darwin-x64": "^0.34.5",
+    "@img/sharp-libvips-darwin-arm64": "^1.2.4",
+    "@img/sharp-libvips-darwin-x64": "^1.2.4",
+    "@img/sharp-win32-x64": "^0.34.5",
+    "sharp": "0.34.5"
+  }
+}

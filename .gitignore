@@ -1,0 +1,5 @@
+# server/vendor/node_modules is deliberately tracked: it is the render backend that
+# ships inside the signed app bundle, and an installed app has no npm and no network.
+# Do not add a node_modules rule here without reading server/vendor/README.md.
+.DS_Store
+*.log

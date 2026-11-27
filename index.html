@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PhotoNext</title>
+    <link rel="icon" type="image/png" href="logo.png" />
+    <!--
+      PhotoNext is an agent cockpit, not a human editor with an agent bolted on.
+
+      Every control in this document is a view of a `photo_*` tool: the layer
+      rows call photo_layer, the adjustment stack calls photo_adjust, the brush
+      calls photo_draw, and the history list calls photo_history. Nothing here
+      reaches the document directly. That is deliberate — the agent and this
+      panel drive the same tools, so what the model sees in photo_status and what
+      the sidebar shows can never be two different documents.
+
+      The panel is opened automatically by the host when one of those tools runs
+      (the extension declares sidebar.agentOnly), and it can be put away without
+      stopping the agent's work.
+    -->
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <div class="cockpit">
+      <header class="topbar">
+        <div class="identity">
+          <span class="mark" aria-hidden="true">
+            <img src="mark.png" alt="" draggable="false" />
+          </span>
+          <span class="title">PhotoNext</span>
+          <span class="chip" title="Every control in this panel is a PhotoNext tool call">Agent cockpit</span>
+        </div>
+
+        <div class="docline">
+          <span class="doc-name" id="docTitle">No document</span>
+          <span class="doc-sub" id="docSubtitle">Waiting for the agent</span>
+        </div>
+
+        <div class="top-tools">
+          <span class="rev" id="rev" title="Document revision">rev 0</span>
+          <div class="seg" role="group" aria-label="Preview zoom">
+            <button type="button" data-zoom="fit" aria-pressed="true">Fit</button>
+            <button type="button" data-zoom="1" aria-pressed="false">1:1</button>
+            <button type="button" data-zoom="2" aria-pressed="false">2:1</button>
+          </div>
+          <button
+            class="scene-toggle"
+            id="sceneToggle"
+            type="button"
+            data-view="3d"
+            aria-pressed="false"
+            title="Orbit the native 3D scene without changing the document"
+            hidden
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3.2 20 7.6v8.8L12 20.8 4 16.4V7.6zM12 3.2v8.8M12 12l8-4.4M12 12 4 7.6" />
+            </svg>
+            3D
+          </button>
+          <!-- Closes this panel, and only this chat's copy of it. The agent and
+               its document keep running; reopening returns to the same edit. -->
+          <button
+            class="panel-close"
+            id="closePanel"
+            type="button"
+            title="Close the PhotoNext panel (the agent keeps working)"
+            aria-label="Close PhotoNext"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="workarea">
+        <!-- The tool rail is the document's whole surface, in order. A row is a
+             mode for the canvas, not an edit: the edit happens through the tool
+             the row names, so arming the brush cannot disagree with what the
+             agent is using. -->
+        <nav class="toolrail" id="toolrail" aria-label="PhotoNext tools"></nav>
+
+        <main class="canvas">
+          <div class="canvas-head">
+            <span class="armed" id="toolReadout">Inspect</span>
+            <span class="head-spacer"></span>
+            <span class="dims" id="canvasDims">—</span>
+            <span class="sep" aria-hidden="true"></span>
+            <span class="scale" id="scaleReadout">—</span>
+          </div>
+
+          <div class="stage" id="stage">
+            <div class="empty" id="empty">
+              <img class="empty-logo" src="logo.png" alt="PhotoNext" draggable="false" />
+              <h1>No image yet</h1>
+              <p>
+                The agent opens this cockpit when it starts a photo. Import with
+                <code>photo_import</code> and the working document appears here.
+              </p>
+              <span class="hint">Tool-backed · every control below calls the same tools the agent does</span>
+            </div>
+
+            <div class="plate" id="plate" hidden>
+              <img id="preview" alt="" draggable="false" />
+              <svg class="overlay" id="overlay" aria-hidden="true">
+                <defs>
+                  <pattern id="cropShade" width="6" height="6" patternUnits="userSpaceOnUse">
+                    <path d="M0 6 6 0" stroke="rgba(8, 12, 18, 0.42)" stroke-width="2" />
+                  </pattern>
+                </defs>
+                <rect id="cropShadeRect" hidden fill="url(#cropShade)" />
+                <rect id="regionBox" hidden />
+                <rect id="selectionBox" hidden />
+                <g id="cropHandles" hidden>
+                  <rect class="handle" data-handle="nw" width="8" height="8" />
+                  <rect class="handle" data-handle="ne" width="8" height="8" />
+                  <rect class="handle" data-handle="se" width="8" height="8" />
+                  <rect class="handle" data-handle="sw" width="8" height="8" />
+                </g>
+                <polyline id="trail" hidden />
+                <circle id="halo" hidden />
+                <circle id="pulse" hidden />
+              </svg>
+              <div class="cursor" id="cursor" hidden aria-hidden="true">
+                <svg class="cursor-glyph" id="cursorGlyph" viewBox="0 0 24 24"></svg>
+                <span class="cursor-label" id="cursorLabel"></span>
+                <span class="cursor-coords" id="cursorCoords"></span>
+              </div>
+              <span class="ripple" id="ripple" hidden aria-hidden="true"></span>
+              <div class="marquee-live" id="marqueeLive" hidden aria-hidden="true"></div>
+            </div>
+
+            <div class="scene-view" id="sceneView" hidden>
+              <img id="sceneImage" alt="" draggable="false" />
+              <div class="scene-loader" id="sceneLoader" role="status">Loading native 3D preview…</div>
+              <button class="scene-reset" id="sceneReset" type="button" data-view="reset">Reset view</button>
+              <div class="scene-hud" id="sceneHud">
+                <span class="scene-orbit" id="orbitReadout">Framing…</span>
+                <span class="scene-hint">Drag to orbit · Scroll to zoom</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="canvas-foot">
+            <div class="activity-line" id="stageStatus">
+              <span class="live-dot" id="liveDot" aria-hidden="true"></span>
+              <span id="activity">Waiting for the agent</span>
+            </div>
+            <div class="coords" id="coords">—</div>
+          </div>
+
+          <div class="crop-confirm" id="cropConfirm" hidden role="group" aria-label="Crop">
+            <span id="cropReadout">—</span>
+            <button type="button" id="cropApply" data-crop="apply">Apply crop</button>
+            <button type="button" class="quiet" id="cropCancel" data-crop="cancel">Cancel</button>
+          </div>
+
+          <div class="toast" id="toast" hidden role="status"></div>
+        </main>
+
+        <aside class="inspector" aria-label="Document inspector">
+          <div class="tabs" role="tablist" id="tabs">
+            <button type="button" role="tab" data-tab="layers" aria-selected="true">Layers</button>
+            <button type="button" role="tab" data-tab="adjust" aria-selected="false">Adjust</button>
+            <button type="button" role="tab" data-tab="select" aria-selected="false">Select</button>
+            <button type="button" role="tab" data-tab="brush" aria-selected="false">Brush</button>
+            <button type="button" role="tab" data-tab="text3d" aria-selected="false">3D Type</button>
+            <button type="button" role="tab" data-tab="effects" aria-selected="false">Effects</button>
+            <button type="button" role="tab" data-tab="history" aria-selected="false">History</button>
+            <button type="button" role="tab" data-tab="info" aria-selected="false">Info</button>
+          </div>
+
+          <div class="panel" data-panel="layers">
+            <div class="panel-head">
+              <h2>Layers <span class="count" id="layerCount">0</span></h2>
+              <span class="panel-note">call photo_layer</span>
+            </div>
+            <ul class="layers" id="layers"></ul>
+            <p class="panel-empty" id="layersEmpty">No layers yet. The agent starts with photo_import.</p>
+            <div class="layer-tools">
+              <button type="button" data-layer-action="mask" title="Create a layer mask from the selection (photo_mask)">Mask</button>
+              <button type="button" data-layer-action="duplicate" title="Duplicate the active layer (photo_layer)">Duplicate</button>
+              <button type="button" data-layer-action="delete" title="Delete the active layer (photo_layer)">Delete</button>
+              <button type="button" data-layer-action="mergeDown" title="Merge down (photo_layer)">Merge</button>
+              <button type="button" data-layer-action="flatten" title="Flatten the document (photo_layer)">Flatten</button>
+            </div>
+            <div class="props" id="layerProps">
+              <label class="field">
+                <span>Blend</span>
+                <select id="blendMode" aria-label="Layer blend mode"></select>
+              </label>
+              <label class="field row">
+                <span>Opacity</span>
+                <input id="layerOpacity" type="range" min="0" max="100" step="1" value="100" />
+                <output id="layerOpacityOut">100%</output>
+              </label>
+              <div class="text-props" id="textProps" hidden>
+                <label class="field">
+                  <span>Text</span>
+                  <textarea id="textContent" rows="2" aria-label="Editable text content"></textarea>
+                </label>
+                <div class="text-grid">
+                  <label class="field">
+                    <span>Size</span>
+                    <input id="textSize" type="number" min="4" max="2000" step="1" />
+                  </label>
+                  <label class="field">
+                    <span>Colour</span>
+                    <input id="textColor" type="color" />
+                  </label>
+                </div>
+                <div class="text-grid">
+                  <label class="field">
+                    <span>Baseline X</span>
+                    <input id="textX" type="number" step="1" />
+                  </label>
+                  <label class="field">
+                    <span>Baseline Y</span>
+                    <input id="textY" type="number" step="1" />
+                  </label>
+                </div>
+                <button type="button" id="textApply" data-text="apply" title="Apply the text fields (photo_text set)">Apply text</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel" data-panel="adjust" hidden>
+            <div class="panel-head">
+              <h2>Adjust</h2>
+              <span class="panel-note">call photo_adjust</span>
+            </div>
+            <div class="quick-grid" id="adjustQuick">
+              <button type="button" data-adjust="auto">Auto tone</button>
+              <button type="button" data-adjust="bw">Black &amp; white</button>
+              <button type="button" data-adjust="invert">Invert</button>
+              <button type="button" data-adjust="warm">Warm</button>
+              <button type="button" data-adjust="cool">Cool</button>
+              <button type="button" data-adjust="punch">Punch</button>
+              <button type="button" data-adjust="soften">Soften</button>
+              <button type="button" data-adjust="sharpen">Sharpen</button>
+            </div>
+            <div class="sliders">
+              <label class="field row">
+                <span>Exposure</span>
+                <input id="adjExposure" type="range" min="-2" max="2" step="0.05" value="0" />
+                <output id="adjExposureOut">0.00</output>
+              </label>
+              <label class="field row">
+                <span>Contrast</span>
+                <input id="adjContrast" type="range" min="-100" max="100" step="1" value="0" />
+                <output id="adjContrastOut">0</output>
+              </label>
+              <label class="field row">
+                <span>Saturation</span>
+                <input id="adjSaturation" type="range" min="-100" max="100" step="1" value="0" />
+                <output id="adjSaturationOut">0</output>
+              </label>
+              <label class="field row">
+                <span>Temperature</span>
+                <input id="adjTemperature" type="range" min="3000" max="10000" step="50" value="6500" />
+                <output id="adjTemperatureOut">6500K</output>
+              </label>
+            </div>
+            <div class="panel-actions">
+              <label class="check"><input id="adjSelection" type="checkbox" /> selection only</label>
+              <label class="check"><input id="adjLayer" type="checkbox" checked /> non-destructive</label>
+              <button type="button" class="primary" id="adjApply" data-adjust="stack">Apply stack</button>
+            </div>
+            <p class="panel-hint">
+              Applies the four sliders as one adjustment layer. The agent can
+              target any adjustment layer by id with <code>photo_adjust</code>.
+            </p>
+          </div>
+
+          <div class="panel" data-panel="select" hidden>
+            <div class="panel-head">
+              <h2>Selection</h2>
+              <span class="panel-note">call photo_select</span>
+            </div>
+            <div class="quick-grid">
+              <button type="button" data-select="all">All</button>
+              <button type="button" data-select="none">None</button>
+              <button type="button" data-select="invert">Invert</button>
+            </div>
+            <label class="field row">
+              <span>Feather</span>
+              <input id="selectFeather" type="number" min="0" max="400" step="1" value="6" />
+              <button type="button" data-select="feather">Feather</button>
+            </label>
+            <label class="field row">
+              <span>Grow</span>
+              <input id="selectGrow" type="number" min="0" max="200" step="1" value="4" />
+              <button type="button" data-select="grow">Grow</button>
+              <button type="button" data-select="contract">Contract</button>
+            </label>
+            <label class="field row">
+              <span>Wand tolerance</span>
+              <input id="wandTolerance" type="range" min="0" max="120" step="1" value="32" />
+              <output id="wandToleranceOut">32</output>
+            </label>
+            <label class="field row">
+              <span>Save as</span>
+              <input id="selectName" type="text" placeholder="corner" />
+              <button type="button" data-select="save">Save</button>
+            </label>
+            <ul class="saved" id="savedSelections"></ul>
+            <p class="panel-empty" id="savedEmpty">No saved selections.</p>
+          </div>
+
+          <div class="panel" data-panel="brush" hidden>
+            <div class="panel-head">
+              <h2>Brush</h2>
+              <span class="panel-note">call photo_draw</span>
+            </div>
+            <div class="brush-preview">
+              <span class="brush-nib" id="brushNib" aria-hidden="true"></span>
+              <div class="brush-facts">
+                <strong id="brushTitle">Sketch nib</strong>
+                <span id="brushFacts">6 px · pressure taper · smoothed</span>
+              </div>
+            </div>
+            <label class="field row">
+              <span>Size</span>
+              <input id="brushSize" type="range" min="1" max="120" step="1" value="6" />
+              <output id="brushSizeOut">6</output>
+            </label>
+            <label class="field row">
+              <span>Opacity</span>
+              <input id="brushOpacity" type="range" min="5" max="100" step="1" value="100" />
+              <output id="brushOpacityOut">100%</output>
+            </label>
+            <label class="field row">
+              <span>Symmetry</span>
+              <select id="brushSymmetry">
+                <option value="none">Off</option>
+                <option value="horizontal">Horizontal</option>
+                <option value="vertical">Vertical</option>
+                <option value="quad">Quad</option>
+                <option value="radial">Radial</option>
+              </select>
+            </label>
+            <div class="swatches" id="swatches" role="group" aria-label="Brush colour"></div>
+            <label class="field row">
+              <span>Colour</span>
+              <input id="brushColor" type="color" value="#161a20" />
+              <input id="brushColorHex" type="text" value="#161a20" spellcheck="false" />
+            </label>
+            <label class="field row">
+              <span>Fill tol.</span>
+              <input id="fillTolerance" type="number" min="0" max="255" step="1" value="32" />
+            </label>
+            <label class="field row">
+              <span>Gradient</span>
+              <input id="gradientEnd" type="color" value="#ffffff" aria-label="Gradient end colour" title="Gradient end colour" />
+              <select id="gradientShape" aria-label="Gradient shape">
+                <option value="linear">Linear</option>
+                <option value="radial">Radial</option>
+              </select>
+            </label>
+            <div class="panel-actions">
+              <label class="check"><input id="brushPressure" type="checkbox" checked /> pressure taper</label>
+              <label class="check"><input id="brushSmooth" type="checkbox" checked /> smooth</label>
+            </div>
+            <p class="panel-hint">
+              Drag on the canvas to sketch. The stroke is one
+              <code>photo_draw</code> <code>sketch</code> command — the fastest
+              path for the agent's rough passes, because many strokes cost one
+              tool call and one undo step. Symmetry mirrors the whole pass in
+              the same call; bucket fill and gradient paint with the same
+              tool-backed path.
+            </p>
+          </div>
+
+          <div class="panel" data-panel="text3d" hidden>
+            <div class="panel-head">
+              <h2>3D Type</h2>
+              <span class="panel-note">call photo_text3d</span>
+            </div>
+            <label class="field">
+              <span>Text</span>
+              <textarea id="text3dText" rows="2" maxlength="400" spellcheck="false" aria-label="3D text">MINOTAURIS</textarea>
+            </label>
+            <div class="field-pair">
+              <label class="field">
+                <span>Font</span>
+                <input id="text3dFont" type="text" value="sans-serif" list="text3dFonts" spellcheck="false" />
+                <datalist id="text3dFonts"></datalist>
+              </label>
+              <label class="field">
+                <span>Weight</span>
+                <select id="text3dWeight" aria-label="3D text weight">
+                  <option value="400">400</option>
+                  <option value="600">600</option>
+                  <option value="700" selected>700</option>
+                  <option value="800">800</option>
+                  <option value="900">900</option>
+                </select>
+              </label>
+            </div>
+            <label class="field row">
+              <span>Depth</span>
+              <input id="text3dDepth" type="range" min="0" max="1.2" step="0.01" value="0.32" />
+              <output id="text3dDepthOut">0.32</output>
+            </label>
+            <label class="field row">
+              <span>Bevel</span>
+              <input id="text3dBevel" type="range" min="0" max="0.2" step="0.005" value="0.03" />
+              <output id="text3dBevelOut">0.030</output>
+            </label>
+            <label class="field row">
+              <span>Twist</span>
+              <input id="text3dTwist" type="range" min="-360" max="360" step="5" value="0" data-unit="°" />
+              <output id="text3dTwistOut">0°</output>
+            </label>
+            <label class="field row">
+              <span>Yaw</span>
+              <input id="text3dYaw" type="range" min="-60" max="60" step="1" value="24" data-unit="°" />
+              <output id="text3dYawOut">24°</output>
+            </label>
+            <label class="field row">
+              <span>Pitch</span>
+              <input id="text3dPitch" type="range" min="-40" max="50" step="1" value="8" data-unit="°" />
+              <output id="text3dPitchOut">8°</output>
+            </label>
+            <div class="field-pair">
+              <label class="field">
+                <span>Material</span>
+                <select id="text3dMaterial" aria-label="3D text material">
+                  <option value="solid">Solid</option>
+                  <option value="chrome">Chrome</option>
+                  <option value="neon">Neon</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Face</span>
+                <input id="text3dFace" type="color" value="#f5c542" />
+              </label>
+            </div>
+            <div class="field-triple">
+              <label class="field">
+                <span>Side</span>
+                <input id="text3dSide" type="color" value="#8a5a12" />
+              </label>
+              <label class="field">
+                <span>Bevel</span>
+                <input id="text3dBevelColor" type="color" value="#ffe9a8" />
+              </label>
+              <label class="field">
+                <span>Top</span>
+                <input id="text3dFaceTop" type="color" value="#ffe08a" />
+              </label>
+            </div>
+            <div class="field-pair">
+              <label class="field">
+                <span>Gradient base</span>
+                <input id="text3dFaceBottom" type="color" value="#e09b1a" />
+              </label>
+              <label class="check check-end">
+                <input id="text3dGradient" type="checkbox" /> face gradient
+              </label>
+            </div>
+            <label class="check"><input id="text3dShadow" type="checkbox" /> cast shadow</label>
+            <div class="panel-actions">
+              <button type="button" id="text3dPreviewBtn" data-text3d="preview">Preview</button>
+              <button type="button" class="primary" id="text3dRenderBtn" data-text3d="render">Add layer</button>
+            </div>
+            <div class="native-preview" id="text3dPreviewWrap" hidden>
+              <img id="text3dPreview" alt="Native 3D text preview" draggable="false" />
+              <span class="preview-stats" id="text3dStats"></span>
+            </div>
+            <p class="panel-hint">
+              Preview is a still of the native renderer. Add layer renders at the
+              document size and creates one undo step. The first call uses the
+              bundled engine; no compiler is needed.
+            </p>
+          </div>
+
+          <div class="panel" data-panel="effects" hidden>
+            <div class="panel-head">
+              <h2>Effects</h2>
+              <span class="panel-note">call photo_effect</span>
+            </div>
+            <label class="field">
+              <span>Effect</span>
+              <select id="effectType" aria-label="Native effect"></select>
+            </label>
+            <div class="effect-params" id="effectParams"></div>
+            <div class="panel-actions">
+              <button type="button" id="effectPreviewBtn" data-effect="preview">Preview</button>
+              <button type="button" class="primary" id="effectApplyBtn" data-effect="apply">Apply</button>
+            </div>
+            <div class="native-preview" id="effectPreviewWrap" hidden>
+              <img id="effectPreview" alt="Native effect preview" draggable="false" />
+              <span class="preview-stats" id="effectStats"></span>
+            </div>
+            <p class="panel-hint">
+              The preview processes a downscaled copy. Apply runs the same C++
+              effect on the active raster layer at full resolution, replacing it
+              in one undoable step. Target: <span id="effectTarget">active raster</span>.
+            </p>
+          </div>
+
+          <div class="panel" data-panel="history" hidden>
+            <div class="panel-head">
+              <h2>History <span class="count" id="historyCount">0</span></h2>
+              <div class="mini-actions">
+                <button type="button" data-history="undo" id="undoButton">Undo</button>
+                <button type="button" data-history="redo" id="redoButton">Redo</button>
+              </div>
+            </div>
+            <ol class="history" id="history"></ol>
+            <p class="panel-empty" id="historyEmpty">No edits yet.</p>
+            <p class="panel-hint">Click a step to walk the document back or forward to it.</p>
+          </div>
+
+          <div class="panel" data-panel="info" hidden>
+            <div class="panel-head">
+              <h2>Info</h2>
+              <span class="panel-note">photo_status</span>
+            </div>
+            <div class="info" id="info"></div>
+            <section class="histo">
+              <div class="histo-head">
+                <h2>Tonal distribution</h2>
+                <ul class="legend" aria-hidden="true">
+                  <li><i class="swatch red"></i>R</li>
+                  <li><i class="swatch green"></i>G</li>
+                  <li><i class="swatch blue"></i>B</li>
+                </ul>
+              </div>
+              <canvas
+                id="histogram"
+                width="512"
+                height="120"
+                aria-label="RGB histogram of the working image"
+                hidden
+              ></canvas>
+              <div class="histo-axis" id="histogramAxis">
+                <span>0</span><span>64</span><span>128</span><span>192</span><span>255</span>
+              </div>
+              <p class="panel-empty" id="histogramEmpty">
+                No histogram yet. Import an image to read its tones.
+              </p>
+            </section>
+            <section class="tools-list">
+              <h2>Tool surface</h2>
+              <ul id="toolList"></ul>
+            </section>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="statusbar">
+        <span class="file" id="file">Waiting for an image</span>
+        <span class="quiet" id="size"></span>
+        <span class="quiet" id="format"></span>
+        <span class="grow"></span>
+        <span class="quiet" id="engine">libvips</span>
+      </footer>
+    </div>
+
+    <script src="bridge.js"></script>
+    <script src="view.js"></script>
+  </body>
+</html>

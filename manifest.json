@@ -1,0 +1,47 @@
+{
+  "manifestVersion": 1,
+  "id": "com.minotauris.photonext",
+  "name": "PhotoNext",
+  "version": "0.14.0",
+  "publisher": {
+    "id": "minotauris"
+  },
+  "description": "An agent-first image cockpit with a real raster engine: curves, levels, HSL, white balance, blur and sharpen, selections, layer masks, 26 blend modes, rotations, skew and perspective correction, GIMP-inspired fuzzy bucket fill, multi-stop linear/radial gradients and mirrored sketch symmetry, vector drawing with brush, sketch, shape and text commands, editable text layers whose string, typography, colour and transform stay live through snapshots and undo, native C++ extruded 3D text with bevels, lighting and soft shadows, twenty native effects including oil paint, halftone, whirl, pixel sort, bloom, mosaic, lens distortion, wave, chromatic aberration, pencil sketch, poster edges, watercolour and paper grain, tiered inspection with revision deltas and pixel diffs, a canonical geometry contract, structured errors, idempotent retries, batched recipes with one-undo groups, text measurement and contrast checks, export preflight and equal-gap layout, 3D model compositing through the bundled native rasteriser, and full-resolution processing that returns to the document as normal layers. The native engine ships as a per-platform prebuilt binary, so it works without a compiler, and the sidebar exposes 3D Type and Effects panels that drive the same photo_text3d and photo_effect tools as the agent. The sidebar is a Photoshop-style control surface: layers, adjustment stacks, selections, brush pressure, fill/gradient controls, symmetry and history all mirror the same tools the agent calls, and every control talks back through those tools. A simulated pointer follows the agent at the pixel it is working on, with pressure-aware brush halos and marquee drags.",
+  "runtime": {
+    "kind": "process",
+    "language": "node",
+    "entry": "server/main.cjs",
+    "transport": "stdio",
+    "startupTimeoutMs": 30000
+  },
+  "view": {
+    "entry": "index.html",
+    "windows": [
+      "sidebar"
+    ],
+    "minSize": {
+      "width": 360,
+      "height": 320
+    }
+  },
+  "capabilities": {
+    "filesystem": "extension-data",
+    "tools": true
+  },
+  "contributes": {
+    "views": [
+      {
+        "id": "main",
+        "title": "PhotoNext",
+        "icon": "image"
+      }
+    ],
+    "skills": [
+      "skills/photo.md"
+    ],
+    "sidebar": {
+      "pinned": false,
+      "agentOnly": true
+    }
+  }
+}

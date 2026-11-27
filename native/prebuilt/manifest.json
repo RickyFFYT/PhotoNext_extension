@@ -1,0 +1,31 @@
+{
+  "engineVersion": "1.2.0",
+  "binaries": [
+    {
+      "platform": "darwin",
+      "arch": "arm64",
+      "file": "photonext_fx-darwin-arm64",
+      "bytes": 625360,
+      "sha256": "234643ede7a82245c7cd04b3119a3b040263b03e82df44bff444a77771b016b5",
+      "builtAt": "2026-11-27T02:58:50.395Z"
+    },
+    {
+      "platform": "darwin",
+      "arch": "x64",
+      "file": "photonext_fx-darwin-x64",
+      "bytes": 625360,
+      "sha256": "234643ede7a82245c7cd04b3119a3b040263b03e82df44bff444a77771b016b5",
+      "builtAt": "2026-11-27T02:58:50.415Z"
+    },
+    {
+      "platform": "win32",
+      "arch": "x64",
+      "file": "photonext_fx-win32-x64.exe",
+      "bytes": 692867,
+      "sha256": "0b82bc18534abd1400cced35b1f7797b4e1cbacf09925acb4b521bec45819dd0",
+      "builtAt": "2026-11-27T02:36:48.415Z"
+    }
+  ],
+  "builtAt": "2026-11-27T02:58:50.415Z",
+  "builtWith": "c++"
+}
